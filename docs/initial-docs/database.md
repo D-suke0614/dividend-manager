@@ -5,6 +5,7 @@
 **DBMS**: PostgreSQL 15（Supabase提供）
 
 **設計方針:**
+
 - 正規化（第3正規形）
 - Row Level Security（RLS）による多テナント対応
 - UUIDによる主キー
@@ -85,6 +86,7 @@ CREATE INDEX idx_securities_accounts_user_id ON securities_accounts(user_id);
 ```
 
 **カラム説明:**
+
 - `id`: 主キー
 - `user_id`: ユーザーID（外部キー）
 - `account_name`: 口座名（例: "SBI証券"）
@@ -124,6 +126,7 @@ CREATE INDEX idx_stocks_market ON stocks(market);
 ```
 
 **カラム説明:**
+
 - `symbol`: ティッカーシンボル（例: "AAPL", "7203.T"）
 - `market`: 市場区分（JP/US/ADR）
 - `currency`: 通貨
@@ -158,11 +161,13 @@ CREATE INDEX idx_holdings_stock_id ON holdings(stock_id);
 ```
 
 **カラム説明:**
+
 - `shares`: 保有株数
 - `average_price`: 平均取得単価
 - `total_cost`: 取得価格合計（= shares × average_price）
 
 **制約:**
+
 - 同じ口座で同じ銘柄は1レコードのみ（UNIQUE制約）
 
 ---
@@ -206,6 +211,7 @@ CREATE INDEX idx_dividends_received_date ON dividends(received_date);
 ```
 
 **カラム説明:**
+
 - `holding_id`: どの口座のどの銘柄か
 - `shares_at_payment`: 配当受取時の株数
 - `tax_type`: 税区分
@@ -230,6 +236,7 @@ CREATE INDEX idx_exchange_rates_date ON exchange_rates(date DESC);
 ```
 
 **カラム説明:**
+
 - `date`: 日付
 - `usd_jpy`: USD/JPY為替レート
 
@@ -256,6 +263,7 @@ CREATE INDEX idx_stock_price_history_stock_date ON stock_price_history(stock_id,
 ```
 
 **カラム説明:**
+
 - `close_price`: 終値
 
 **更新頻度**: 1日1回（バッチ処理）
@@ -437,14 +445,17 @@ CREATE TRIGGER update_dividends_updated_at
 ### よく検索されるカラム
 
 **holdings:**
+
 - `user_id` + `stock_id`（銘柄別集計）
 - `account_id`（口座別表示）
 
 **dividends:**
+
 - `user_id` + `received_date`（年別集計）
 - `holding_id`（銘柄別配当履歴）
 
 **stocks:**
+
 - `symbol`（銘柄検索）
 - `market`（市場フィルター）
 
@@ -509,15 +520,18 @@ stock_price_history: 100銘柄 × 365日 × 100B = 3.6MB（全ユーザー共通
 ### Supabase自動バックアップ
 
 **無料プラン:**
+
 - 7日間のPoint-in-Time Recovery
 
 **有料プラン（Pro: $25/月）:**
+
 - 30日間のPoint-in-Time Recovery
 - 手動バックアップ
 
 ### エクスポート機能
 
 **CSV/JSONエクスポート:**
+
 - ユーザーごとにデータをエクスポート
 - 定期的なローカルバックアップ推奨
 
@@ -528,6 +542,7 @@ stock_price_history: 100銘柄 × 365日 × 100B = 3.6MB（全ユーザー共通
 ### N+1問題の回避
 
 **悪い例:**
+
 ```typescript
 // 銘柄ごとにクエリ（N+1問題）
 for (const holding of holdings) {
@@ -536,12 +551,10 @@ for (const holding of holdings) {
 ```
 
 **良い例:**
+
 ```typescript
 // JOINで一度に取得
-const { data } = await supabase
-  .from('holdings')
-  .select('*, stock:stocks(*)')
-  .eq('user_id', userId);
+const { data } = await supabase.from('holdings').select('*, stock:stocks(*)').eq('user_id', userId);
 ```
 
 ### ページング

@@ -30,31 +30,36 @@ Data Source: yahoo-finance2 (株価・配当データ)
 開発を始める前に、以下のツールをインストールしてください。
 
 必須ツール
+
 1. Node.js 20.x LTS
-macOS (Homebrew):
+   macOS (Homebrew):
 
 bash
 brew install node@20
 Windows (nvm-windows):
 
 bash
+
 # nvm-windowsをインストール: https://github.com/coreybutler/nvm-windows/releases
+
 nvm install 20
 nvm use 20
 Linux (nvm):
 
 bash
+
 # nvmをインストール
+
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 
 # Node.js 20をインストール
+
 nvm install 20
 nvm use 20
 確認:
 
 bash
-node --version  # v20.x.x が表示されればOK
-2. pnpm
+node --version # v20.x.x が表示されればOK 2. pnpm
 インストール:
 
 bash
@@ -62,8 +67,7 @@ npm install -g pnpm
 確認:
 
 bash
-pnpm --version  # 8.x.x 以上が表示されればOK
-3. Git
+pnpm --version # 8.x.x 以上が表示されればOK 3. Git
 macOS:
 
 bash
@@ -73,13 +77,12 @@ Windows: Git for Windows からインストーラーをダウンロード
 Linux:
 
 bash
-sudo apt-get install git  # Ubuntu/Debian
-sudo yum install git      # CentOS/RHEL
+sudo apt-get install git # Ubuntu/Debian
+sudo yum install git # CentOS/RHEL
 確認:
 
 bash
-git --version
-4. Docker Desktop
+git --version 4. Docker Desktop
 Supabaseローカル開発に必要です。
 
 インストール:
@@ -103,54 +106,63 @@ Prettier
 Tailwind CSS IntelliSense
 Prisma
 🔧 セットアップ
+
 1. リポジトリをクローン
-bash
-git clone https://github.com/your-username/dividend-manager.git
-cd dividend-manager
+   bash
+   git clone https://github.com/your-username/dividend-manager.git
+   cd dividend-manager
 2. 依存関係をインストール
-bash
-pnpm install
+   bash
+   pnpm install
 3. 環境変数を設定
-bash
+   bash
+
 # .env.exampleをコピー
+
 cp .env.example .env.local
 .env.local を編集:
 
 bash
+
 # Supabase（ローカル開発用）
+
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc... # ローカル開発用の固定キー
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGc...    # ローカル開発用の固定キー
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGc... # ローカル開発用の固定キー
 
 # ExchangeRate API（本番環境のみ必要）
+
 EXCHANGE_RATE_API_KEY=your-api-key-here
 注意: ローカル開発時のSupabaseキーは、pnpm supabase:start 実行後に表示されます。
 
 4. Supabaseローカル環境を起動
-bash
+   bash
+
 # Docker Desktopが起動していることを確認
+
 # Supabaseをローカルで起動
+
 pnpm supabase:start
 初回は時間がかかります（Dockerイメージのダウンロード）。
 完了すると以下のサービスが起動します:
 
 PostgreSQL: http://localhost:54322
 Supabase Studio: http://localhost:54323
-API: http://localhost:54321
-5. データベースのマイグレーション
+API: http://localhost:54321 5. データベースのマイグレーション
 bash
+
 # マイグレーション実行
+
 pnpm supabase:migrate
 
 # シードデータ投入（オプション）
-pnpm supabase:seed
-6. 開発サーバーを起動
+
+pnpm supabase:seed 6. 開発サーバーを起動
 bash
 pnpm dev
 ブラウザで確認:
 
-http://localhost:3000
-7. 動作確認
+http://localhost:3000 7. 動作確認
 ブラウザで http://localhost:3000 にアクセス
 ユーザー登録ページが表示されればOK
 テストユーザーを作成してログイン
@@ -158,23 +170,23 @@ http://localhost:3000
 
 📊 プロジェクト構造
 dividend-manager/
-├── app/                    # Next.js App Router
-│   ├── (auth)/            # 認証関連ページ
-│   ├── (dashboard)/       # メインアプリ
-│   └── api/               # API Routes
-├── components/            # Reactコンポーネント
-│   ├── ui/               # shadcn/uiコンポーネント
-│   └── features/         # 機能別コンポーネント
-├── lib/                   # ユーティリティ
-│   ├── supabase/         # Supabaseクライアント
-│   ├── trpc/             # tRPC設定
-│   └── utils/            # ヘルパー関数
-├── server/                # tRPCサーバー
-│   └── routers/          # APIルーター
-├── types/                 # TypeScript型定義
-├── docs/                  # ドキュメント
-├── e2e/                   # E2Eテスト
-└── supabase/             # Supabaseマイグレーション
+├── app/ # Next.js App Router
+│ ├── (auth)/ # 認証関連ページ
+│ ├── (dashboard)/ # メインアプリ
+│ └── api/ # API Routes
+├── components/ # Reactコンポーネント
+│ ├── ui/ # shadcn/uiコンポーネント
+│ └── features/ # 機能別コンポーネント
+├── lib/ # ユーティリティ
+│ ├── supabase/ # Supabaseクライアント
+│ ├── trpc/ # tRPC設定
+│ └── utils/ # ヘルパー関数
+├── server/ # tRPCサーバー
+│ └── routers/ # APIルーター
+├── types/ # TypeScript型定義
+├── docs/ # ドキュメント
+├── e2e/ # E2Eテスト
+└── supabase/ # Supabaseマイグレーション
 🎨 画面構成
 ダッシュボード: ポートフォリオサマリー、銘柄一覧、グラフ
 銘柄詳細: 保有状況、配当履歴、配当入力フォーム
@@ -183,20 +195,27 @@ dividend-manager/
 設定: 表示設定、データ管理
 🧪 テスト
 bash
+
 # 単体テスト
+
 pnpm test
 
 # E2Eテスト
+
 pnpm test:e2e
 
 # カバレッジ
+
 pnpm test:coverage
 🚢 デプロイ
 bash
+
 # Vercelにデプロイ
+
 vercel
 
 # 本番環境
+
 vercel --prod
 詳細は DEVELOPMENT.md を参照してください。
 
@@ -204,18 +223,25 @@ vercel --prod
 よくある問題
 Docker関連のエラー
 bash
+
 # Docker Desktopが起動していることを確認
-open -a Docker  # macOS
+
+open -a Docker # macOS
 
 # Docker動作確認
+
 docker ps
 ポートが使用中
 bash
+
 # 別のポートで起動
+
 PORT=3001 pnpm dev
 依存関係のエラー
 bash
+
 # クリーンインストール
+
 rm -rf node_modules pnpm-lock.yaml
 pnpm install
 その他の問題は DEVELOPMENT.md のトラブルシューティングセクションを参照してください。

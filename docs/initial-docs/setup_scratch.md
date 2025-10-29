@@ -120,6 +120,7 @@ brew install supabase/tap/supabase
 ```
 
 **確認:**
+
 ```bash
 supabase --version
 ```
@@ -170,6 +171,7 @@ touch .env.local
 ```
 
 **.env.local に以下を記載:**
+
 ```bash
 # Supabase（ローカル開発用）
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
@@ -182,34 +184,38 @@ SUPABASE_SERVICE_ROLE_KEY=<service_role keyをコピー>
 #### 3-6. Supabaseクライアントを作成
 
 **クライアントサイド用:**
+
 ```bash
 mkdir -p lib/supabase
 touch lib/supabase/client.ts
 ```
 
 **lib/supabase/client.ts:**
+
 ```typescript
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from '@supabase/ssr';
 
 export const createClient = () =>
   createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  );
 ```
 
 **サーバーサイド用:**
+
 ```bash
 touch lib/supabase/server.ts
 ```
 
 **lib/supabase/server.ts:**
+
 ```typescript
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 
 export const createClient = () => {
-  const cookieStore = cookies()
+  const cookieStore = cookies();
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -217,26 +223,26 @@ export const createClient = () => {
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value
+          return cookieStore.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options })
+            cookieStore.set({ name, value, ...options });
           } catch (error) {
             // Server Component内ではset/removeができない場合がある
           }
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: '', ...options })
+            cookieStore.set({ name, value: '', ...options });
           } catch (error) {
             // Server Component内ではset/removeができない場合がある
           }
         },
       },
     }
-  )
-}
+  );
+};
 ```
 
 ---
@@ -250,7 +256,7 @@ export const createClient = () => {
 supabase migration new create_initial_tables
 ```
 
-**supabase/migrations/[timestamp]_create_initial_tables.sql に以下を記載:**
+**supabase/migrations/[timestamp]\_create_initial_tables.sql に以下を記載:**
 
 ```sql
 -- 証券口座テーブル
@@ -384,7 +390,7 @@ CREATE TRIGGER update_dividends_updated_at
 supabase migration new enable_rls
 ```
 
-**supabase/migrations/[timestamp]_enable_rls.sql:**
+**supabase/migrations/[timestamp]\_enable_rls.sql:**
 
 ```sql
 -- securities_accounts のRLS
@@ -465,6 +471,7 @@ supabase gen types typescript --local > types/database.ts
 ```
 
 **package.jsonにスクリプトを追加:**
+
 ```json
 {
   "scripts": {
@@ -499,6 +506,7 @@ INSERT INTO exchange_rates (date, usd_jpy) VALUES
 ```
 
 **シードデータを投入:**
+
 ```bash
 pnpm supabase:seed
 ```
@@ -516,70 +524,76 @@ pnpm add @trpc/server @trpc/client @trpc/react-query @trpc/next @tanstack/react-
 #### 5-2. tRPCサーバーを設定
 
 **server/context.ts:**
+
 ```typescript
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server';
 
 export const createContext = async () => {
-  const supabase = createClient()
+  const supabase = createClient();
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   return {
     supabase,
     userId: user?.id,
-  }
-}
+  };
+};
 
-export type Context = Awaited<ReturnType<typeof createContext>>
+export type Context = Awaited<ReturnType<typeof createContext>>;
 ```
 
 **server/trpc.ts:**
+
 ```typescript
-import { initTRPC, TRPCError } from '@trpc/server'
-import superjson from 'superjson'
-import { Context } from './context'
+import { initTRPC, TRPCError } from '@trpc/server';
+import superjson from 'superjson';
+import { Context } from './context';
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
-})
+});
 
-export const router = t.router
-export const publicProcedure = t.procedure
+export const router = t.router;
+export const publicProcedure = t.procedure;
 
 // 認証が必要なプロシージャ
 export const privateProcedure = t.procedure.use(async ({ ctx, next }) => {
   if (!ctx.userId) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' })
+    throw new TRPCError({ code: 'UNAUTHORIZED' });
   }
   return next({
     ctx: {
       ...ctx,
       userId: ctx.userId,
     },
-  })
-})
+  });
+});
 ```
 
 **server/routers/index.ts:**
+
 ```typescript
-import { router } from '../trpc'
-import { dividendRouter } from './dividend'
-import { stockRouter } from './stock'
-import { accountRouter } from './account'
+import { router } from '../trpc';
+import { dividendRouter } from './dividend';
+import { stockRouter } from './stock';
+import { accountRouter } from './account';
 
 export const appRouter = router({
   dividend: dividendRouter,
   stock: stockRouter,
   account: accountRouter,
-})
+});
 
-export type AppRouter = typeof appRouter
+export type AppRouter = typeof appRouter;
 ```
 
 **server/routers/dividend.ts（例）:**
+
 ```typescript
-import { z } from 'zod'
-import { router, privateProcedure } from '../trpc'
+import { z } from 'zod';
+import { router, privateProcedure } from '../trpc';
 
 export const dividendRouter = router({
   getAll: privateProcedure.query(async ({ ctx }) => {
@@ -587,10 +601,10 @@ export const dividendRouter = router({
       .from('dividends')
       .select('*, holding:holdings(*, stock:stocks(*))')
       .eq('user_id', ctx.userId)
-      .order('received_date', { ascending: false })
+      .order('received_date', { ascending: false });
 
-    if (error) throw error
-    return data
+    if (error) throw error;
+    return data;
   }),
 
   create: privateProcedure
@@ -614,30 +628,32 @@ export const dividendRouter = router({
           shares_at_payment: 100, // 実際の値は別途取得
         })
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
-      return data
+      if (error) throw error;
+      return data;
     }),
-})
+});
 ```
 
 #### 5-3. tRPCクライアントを設定
 
 **lib/trpc/client.ts:**
-```typescript
-import { createTRPCReact } from '@trpc/react-query'
-import type { AppRouter } from '@/server/routers'
 
-export const trpc = createTRPCReact<AppRouter>()
+```typescript
+import { createTRPCReact } from '@trpc/react-query';
+import type { AppRouter } from '@/server/routers';
+
+export const trpc = createTRPCReact<AppRouter>();
 ```
 
 **lib/trpc/server.ts:**
+
 ```typescript
-import { httpBatchLink } from '@trpc/client'
-import { createTRPCProxyClient } from '@trpc/client'
-import type { AppRouter } from '@/server/routers'
-import superjson from 'superjson'
+import { httpBatchLink } from '@trpc/client';
+import { createTRPCProxyClient } from '@trpc/client';
+import type { AppRouter } from '@/server/routers';
+import superjson from 'superjson';
 
 export const serverTrpc = createTRPCProxyClient<AppRouter>({
   transformer: superjson,
@@ -646,14 +662,15 @@ export const serverTrpc = createTRPCProxyClient<AppRouter>({
       url: `${process.env.NEXT_PUBLIC_APP_URL}/api/trpc`,
     }),
   ],
-})
+});
 ```
 
 **app/api/trpc/[trpc]/route.ts:**
+
 ```typescript
-import { fetchRequestHandler } from '@trpc/server/adapters/fetch'
-import { appRouter } from '@/server/routers'
-import { createContext } from '@/server/context'
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
+import { appRouter } from '@/server/routers';
+import { createContext } from '@/server/context';
 
 const handler = (req: Request) =>
   fetchRequestHandler({
@@ -661,14 +678,15 @@ const handler = (req: Request) =>
     req,
     router: appRouter,
     createContext,
-  })
+  });
 
-export { handler as GET, handler as POST }
+export { handler as GET, handler as POST };
 ```
 
 #### 5-4. tRPC Providerを設定
 
 **app/providers.tsx:**
+
 ```typescript
 'use client'
 
@@ -702,6 +720,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 ```
 
 **app/layout.tsx に追加:**
+
 ```typescript
 import { Providers } from './providers'
 
@@ -733,21 +752,22 @@ pnpm add yahoo-finance2
 #### 6-2. ユーティリティ関数を作成
 
 **lib/yahoo-finance.ts:**
+
 ```typescript
-import yahooFinance from 'yahoo-finance2'
+import yahooFinance from 'yahoo-finance2';
 
 export async function getStockQuote(symbol: string) {
   try {
-    const quote = await yahooFinance.quote(symbol)
+    const quote = await yahooFinance.quote(symbol);
     return {
       currentPrice: quote.regularMarketPrice,
       dividendYield: quote.dividendYield,
       dividendRate: quote.dividendRate,
       exDividendDate: quote.exDividendDate,
-    }
+    };
   } catch (error) {
-    console.error('Failed to fetch stock quote:', error)
-    return null
+    console.error('Failed to fetch stock quote:', error);
+    return null;
   }
 }
 
@@ -756,11 +776,11 @@ export async function getDividendHistory(symbol: string) {
     const result = await yahooFinance.historical(symbol, {
       period1: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000), // 1年前
       events: 'dividends',
-    })
-    return result
+    });
+    return result;
   } catch (error) {
-    console.error('Failed to fetch dividend history:', error)
-    return []
+    console.error('Failed to fetch dividend history:', error);
+    return [];
   }
 }
 ```
@@ -773,18 +793,17 @@ echo "EXCHANGE_RATE_API_KEY=your-api-key-here" >> .env.local
 ```
 
 **lib/exchange-rate.ts:**
+
 ```typescript
 export async function getExchangeRate(date?: Date): Promise<number> {
   try {
-    const apiKey = process.env.EXCHANGE_RATE_API_KEY
-    const response = await fetch(
-      `https://v6.exchangerate-api.com/v6/${apiKey}/latest/USD`
-    )
-    const data = await response.json()
-    return data.conversion_rates.JPY
+    const apiKey = process.env.EXCHANGE_RATE_API_KEY;
+    const response = await fetch(`https://v6.exchangerate-api.com/v6/${apiKey}/latest/USD`);
+    const data = await response.json();
+    return data.conversion_rates.JPY;
   } catch (error) {
-    console.error('Failed to fetch exchange rate:', error)
-    return 140 // フォールバック値
+    console.error('Failed to fetch exchange rate:', error);
+    return 140; // フォールバック値
   }
 }
 ```
@@ -796,6 +815,7 @@ export async function getExchangeRate(date?: Date): Promise<number> {
 #### 7-1. ログインページ
 
 **app/(auth)/login/page.tsx:**
+
 ```typescript
 'use client'
 
@@ -852,6 +872,7 @@ export default function LoginPage() {
 ### Phase 8: package.jsonスクリプトの設定
 
 **package.json:**
+
 ```json
 {
   "scripts": {

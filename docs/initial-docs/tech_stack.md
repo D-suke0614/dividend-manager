@@ -5,6 +5,7 @@
 ### Frontend Framework
 
 **Next.js 15 (App Router)**
+
 - React Server Components対応
 - ファイルベースルーティング
 - 画像最適化
@@ -13,6 +14,7 @@
 ### Language
 
 **TypeScript 5.x**
+
 - 型安全性
 - 開発体験の向上
 - tRPCとの完全な統合
@@ -20,12 +22,14 @@
 ### UI Framework
 
 **Tailwind CSS + shadcn/ui**
+
 - ユーティリティファーストCSS
 - 高度にカスタマイズ可能なコンポーネント
 - アクセシビリティ対応（Radix UIベース）
 - 開発速度の向上
 
 **選定理由:**
+
 - コンポーネントをプロジェクトにコピーする方式で完全にカスタマイズ可能
 - テーブル、フォーム、ダイアログなど必要なコンポーネントが揃っている
 - TypeScript完全対応
@@ -38,11 +42,13 @@
 ### API層
 
 **tRPC 10.x**
+
 - エンドツーエンドの型安全性
 - React Queryベース（キャッシュ、再取得）
 - Zodバリデーション統合
 
 **使用例:**
+
 ```typescript
 // サーバー側
 export const dividendRouter = router({
@@ -58,11 +64,13 @@ const { data } = trpc.dividend.getAll.useQuery();
 ### フォーム管理
 
 **React Hook Form + Zod**
+
 - 宣言的なバリデーション
 - パフォーマンス最適化
 - TypeScript型推論
 
 **使用例:**
+
 ```typescript
 const schema = z.object({
   amountAfterTax: z.number().positive(),
@@ -77,17 +85,20 @@ const { register, handleSubmit } = useForm({
 ### 状態管理
 
 **Zustand**
+
 - シンプルなAPI
 - TypeScript完全対応
 - 軽量（約1KB）
 
 **使用ケース:**
+
 - ユーザー設定（表示通貨、小数点桁数）
 - グローバルな状態（為替レート、株価キャッシュ）
 
 ### 日付処理
 
 **date-fns**
+
 - Tree-shakable（必要な関数のみバンドル）
 - イミュータブル
 - TypeScript対応
@@ -95,11 +106,13 @@ const { register, handleSubmit } = useForm({
 ### グラフ
 
 **Recharts**
+
 - React向け
 - レスポンシブ
 - カスタマイズ可能
 
 **使用するグラフ:**
+
 - 棒グラフ（年別配当）
 - 折れ線グラフ（資産額推移）
 - エリアグラフ（投資額推移）
@@ -111,6 +124,7 @@ const { register, handleSubmit } = useForm({
 ### Database & Auth
 
 **Supabase**
+
 - PostgreSQL（リレーショナルDB）
 - 自動REST API生成
 - Row Level Security（データ分離）
@@ -118,11 +132,13 @@ const { register, handleSubmit } = useForm({
 - TypeScript型定義自動生成
 
 **無料枠:**
+
 - データベース: 500MB
 - 帯域幅: 5GB/月
 - 認証ユーザー: 50,000人/月
 
 **選定理由:**
+
 - PostgreSQL（強力なRDB）
 - 認証機能が標準装備
 - Next.js App Routerと相性抜群
@@ -131,11 +147,13 @@ const { register, handleSubmit } = useForm({
 ### External APIs
 
 **yahoo-finance2**
+
 - 株価データ取得
 - 配当情報取得
 - 無料、APIキー不要
 
 **取得データ:**
+
 - 現在株価
 - 配当利回り
 - 権利落ち日
@@ -143,6 +161,7 @@ const { register, handleSubmit } = useForm({
 - 配当履歴
 
 **ExchangeRate-API**
+
 - USD/JPY為替レート
 - 無料枠: 1,500リクエスト/月
 
@@ -153,12 +172,14 @@ const { register, handleSubmit } = useForm({
 ### 単体テスト
 
 **Jest + React Testing Library**
+
 - コンポーネントテスト
 - ロジックのテスト
 
 ### E2Eテスト
 
 **Playwright**
+
 - ブラウザ自動化
 - クロスブラウザテスト
 - スクリーンショット比較
@@ -166,6 +187,7 @@ const { register, handleSubmit } = useForm({
 ### APIモック
 
 **MSW (Mock Service Worker)**
+
 - ネットワークレベルでモック
 - 開発・テスト両用
 
@@ -176,17 +198,20 @@ const { register, handleSubmit } = useForm({
 ### Linter & Formatter
 
 **ESLint**
+
 - Next.js推奨設定
 - TypeScript対応
 - React Hooks ルール
 
 **Prettier**
+
 - コードフォーマット自動化
 - チーム内の一貫性
 
 ### Git Hooks
 
 **Husky + lint-staged**
+
 - コミット前に自動チェック
 - ESLint実行
 - Prettier実行
@@ -199,6 +224,7 @@ const { register, handleSubmit } = useForm({
 ### GitHub Actions
 
 **ワークフロー:**
+
 1. Lint & Type Check
 2. Unit Tests
 3. E2E Tests
@@ -206,6 +232,7 @@ const { register, handleSubmit } = useForm({
 5. Deploy (Vercelへ自動デプロイ)
 
 **設定ファイル:**
+
 ```yaml
 # .github/workflows/ci.yml
 on: [push, pull_request]
@@ -233,6 +260,7 @@ jobs:
 ### ホスティング
 
 **Vercel**
+
 - Next.js開発元が提供
 - 自動デプロイ（GitHubプッシュ時）
 - Edge Functions
@@ -240,11 +268,13 @@ jobs:
 - プレビューデプロイ
 
 **無料枠（Hobby）:**
+
 - 100GB帯域幅/月
 - 6,000分ビルド時間/月
 - ⚠️ 個人プロジェクト限定（商用はPro: $20/月）
 
 **将来の選択肢:**
+
 - Cloudflare Pages（完全無料で商用利用可）
 
 ---
@@ -261,6 +291,7 @@ supabase start
 ```
 
 **起動されるサービス:**
+
 - PostgreSQL (5432)
 - Supabase Studio (54323)
 - GoTrue (認証)
@@ -269,6 +300,7 @@ supabase start
 ### Package Manager
 
 **pnpm**
+
 - ディスク容量節約
 - 高速インストール
 - モノレポ対応
@@ -312,6 +344,7 @@ supabase start
 ```
 
 **FE → BFF → BE 構成:**
+
 - **FE**: React Server/Client Components
 - **BFF**: Next.js API Routes (tRPC)
 - **BE**: Supabase + External APIs
@@ -323,6 +356,7 @@ supabase start
 ### 認証
 
 **Supabase Auth**
+
 - JWT（JSON Web Token）
 - HTTPOnly Cookie
 - リフレッシュトークン
@@ -330,6 +364,7 @@ supabase start
 ### データ保護
 
 **Row Level Security (RLS)**
+
 ```sql
 -- ユーザーは自分のデータのみアクセス可能
 CREATE POLICY "Users can only access own data"
@@ -391,6 +426,7 @@ pnpm update --latest
 **推奨: Node.js 20 LTS**
 
 `.nvmrc` ファイルで固定:
+
 ```
 20
 ```
