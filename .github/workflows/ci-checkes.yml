@@ -1,4 +1,4 @@
-name: CI
+name: ci-checks
 
 on:
   pull_request:
@@ -106,7 +106,7 @@ jobs:
   # 4. テスト (Jest) - 将来追加予定
   # ---------------------------------
   # test:
-  #   needs: [build]
+  #   needs: [lint, type-check]
   #   name: Tests (Jest)
   #   runs-on: ubuntu-latest
   #   timeout-minutes: 15
