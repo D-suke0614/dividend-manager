@@ -53,6 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    env:
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
     steps:
       - uses: actions/checkout@v4
 
