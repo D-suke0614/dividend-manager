@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build",
+    "//build:ci": "CI環境・Vercel用のビルド（マイグレーションなし）",
+    "build:ci": "prisma generate && next build",
+    "//build:migrate": "マイグレーション込みのビルド（本番デプロイ時に使用）GitHub Actionsやデプロイ前のスクリプトなどで実行するのが一般的",
+    "build:migrate": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
