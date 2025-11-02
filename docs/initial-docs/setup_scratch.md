@@ -84,21 +84,21 @@ pnpm dlx shadcn-ui@latest init
 
 ```bash
 # よく使うコンポーネントを一括追加
-pnpm dlx shadcn-ui@latest add button
-pnpm dlx shadcn-ui@latest add card
-pnpm dlx shadcn-ui@latest add table
-pnpm dlx shadcn-ui@latest add form
-pnpm dlx shadcn-ui@latest add input
-pnpm dlx shadcn-ui@latest add select
-pnpm dlx shadcn-ui@latest add dialog
-pnpm dlx shadcn-ui@latest add dropdown-menu
-pnpm dlx shadcn-ui@latest add calendar
-pnpm dlx shadcn-ui@latest add popover
-pnpm dlx shadcn-ui@latest add toast
-pnpm dlx shadcn-ui@latest add tabs
-pnpm dlx shadcn-ui@latest add separator
-pnpm dlx shadcn-ui@latest add badge
-pnpm dlx shadcn-ui@latest add alert
+npx shadcn-ui@latest add button
+npx shadcn-ui@latest add card
+npx shadcn-ui@latest add table
+npx shadcn-ui@latest add form
+npx shadcn-ui@latest add input
+npx shadcn-ui@latest add select
+npx shadcn-ui@latest add dialog
+npx shadcn-ui@latest add dropdown-menu
+npx shadcn-ui@latest add calendar
+npx shadcn-ui@latest add popover
+npx shadcn-ui@latest add toast
+npx shadcn-ui@latest add tabs
+npx shadcn-ui@latest add separator
+npx shadcn-ui@latest add badge
+npx shadcn-ui@latest add alert
 ```
 
 ---
