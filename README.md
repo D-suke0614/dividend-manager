@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dividend Manager
 
-## Getting Started
+配当金管理アプリケーション
 
-First, run the development server:
+## 技術スタック
+
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Database**: PostgreSQL
+- **ORM**: Prisma
+- **Styling**: Tailwind CSS 4
+- **Package Manager**: pnpm
+
+## 前提条件
+
+- Node.js 20.18.1
+- pnpm 9.12.0
+- PostgreSQL
+
+## セットアップ
+
+### 1. 依存関係のインストール
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. 環境変数の設定
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`.env`ファイルを作成し
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. データベースのマイグレーション
 
-## Learn More
+```bash
+pnpm prisma migrate dev
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. 開発サーバーの起動
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+pnpm dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+http://localhost:3000 でアプリケーションが起動します。
 
-## Deploy on Vercel
+## 利用可能なコマンド
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 開発
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+pnpm dev              # 開発サーバーを起動
+pnpm type-check       # 型チェックを実行
+pnpm lint             # ESLintでコードをチェック
+pnpm lint:fix         # ESLintで自動修正
+pnpm format           # Prettierでコードをフォーマット
+pnpm format:check     # Prettierのフォーマットチェック
+```
+
+### ビルド
+
+```bash
+pnpm run build:ci       # CI環境・Vercel用（マイグレーションなし）
+pnpm run build:migrate  # マイグレーション込みビルド（本番デプロイ時）
+pnpm start              # 本番サーバーを起動
+```
+
+### データベース
+
+```bash
+pnpm prisma migrate dev --name 変更内容  # マイグレーション作成・適用
+pnpm prisma generate                     # Prisma Clientを生成
+pnpm prisma studio                       # Prisma Studioを起動
+```
+
+## Database Migration
+
+### スキーマ変更時の手順
+
+1. **開発環境**: スキーマ変更後、マイグレーションを作成・適用
+
+- 新しいマイグレーションファイルが`prisma/migrations/`に生成
+- ローカルDBに変更が適用
+
+```bash
+pnpm prisma migrate dev --name 変更内容
+```
+
+2. **本番環境**: 未適用のマイグレーションを実行
+
+- 未適用のマイグレーションファイルが順次適用
+
+```bash
+pnpm run build:migrate
+```
+
+### 注意事項
+
+- `build:migrate`は既存のマイグレーションを実行するだけで、スキーマ変更は行わない
+- 既存のテーブルやデータは保持され、マイグレーションファイルに記述された変更のみが適用される
+- DBを完全に作り直す場合は、手動でDB削除後に`prisma migrate deploy`を実行
+
+## CI/CD
+
+### GitHub Actions
+
+PRの作成・更新時に以下のチェックが自動実行されます:
+
+- コードフォーマットチェック (Prettier)
+- Lint (ESLint)
+- 型チェック (TypeScript)
+- ビルドチェック
+
+ワークフロー: `.github/workflows/ci-checkes.yml`
+
+### Vercel デプロイ設定
+
+**Build Command**: `pnpm run build:ci`
+
+マイグレーションはビルド時には実行されません。本番環境へのマイグレーション適用は別途手動で行ってください。
+
+## 開発ワークフロー
+
+1. 新しいブランチを作成
+2. 機能開発・修正を実施
+3. コミット前に自動でlint・formatが実行される (Husky + lint-staged)
+4. PRを作成すると自動でCIチェックが実行される
+5. レビュー後、mainブランチにマージ
