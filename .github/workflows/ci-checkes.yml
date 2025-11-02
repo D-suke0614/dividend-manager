@@ -53,6 +53,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    env:
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      DIRECT_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -70,6 +74,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Generate Prisma
+        run: pnpm prisma generate
+
       - name: Type check
         run: pnpm run type-check
 
@@ -81,6 +88,10 @@ jobs:
     name: Build Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    env:
+      DATABASE_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
+      DIRECT_URL: "postgresql://dummy:dummy@localhost:5432/dummy"
 
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +111,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm run build
+        run: pnpm run build:ci
 
   # ---------------------------------
   # 4. テスト (Jest) - 将来追加予定
