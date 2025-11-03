@@ -301,6 +301,7 @@ CREATE TABLE holdings (
   shares INTEGER NOT NULL CHECK (shares > 0),
   average_price NUMERIC(12, 4) NOT NULL CHECK (average_price > 0),
   total_cost NUMERIC(15, 2) NOT NULL CHECK (total_cost > 0),
+  is_active BOOLEAN DEFAULT true,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(account_id, stock_id)
@@ -309,6 +310,7 @@ CREATE TABLE holdings (
 CREATE INDEX idx_holdings_user_id ON holdings(user_id);
 CREATE INDEX idx_holdings_account_id ON holdings(account_id);
 CREATE INDEX idx_holdings_stock_id ON holdings(stock_id);
+CREATE INDEX idx_holdings_active ON holdings(user_id, is_active);
 
 -- 配当履歴テーブル
 CREATE TABLE dividends (
@@ -321,7 +323,7 @@ CREATE TABLE dividends (
   amount_before_tax NUMERIC(15, 2),
   amount_after_tax NUMERIC(15, 2) NOT NULL CHECK (amount_after_tax > 0),
   tax_type TEXT NOT NULL CHECK (
-    tax_type IN ('JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD')
+    tax_type IN ('JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD', 'ADR_NISA')
   ),
   foreign_tax NUMERIC(15, 2) DEFAULT 0,
   domestic_tax NUMERIC(15, 2) DEFAULT 0,
@@ -358,6 +360,44 @@ CREATE TABLE stock_price_history (
 
 CREATE INDEX idx_stock_price_history_stock_date ON stock_price_history(stock_id, date DESC);
 
+-- ユーザー設定テーブル
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  default_currency TEXT DEFAULT 'JPY' CHECK (default_currency IN ('JPY', 'USD')),
+  decimal_places INTEGER DEFAULT 2 CHECK (decimal_places BETWEEN 0 AND 4),
+  dividend_month_format TEXT DEFAULT 'number' CHECK (dividend_month_format IN ('number', 'name')),
+  auto_update_enabled BOOLEAN DEFAULT true,
+  update_time TIME DEFAULT '09:00:00',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
+
+-- 売買履歴テーブル
+CREATE TABLE transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  account_id UUID NOT NULL REFERENCES securities_accounts(id) ON DELETE CASCADE,
+  stock_id UUID NOT NULL REFERENCES stocks(id) ON DELETE CASCADE,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('BUY', 'SELL')),
+  transaction_date DATE NOT NULL,
+  shares INTEGER NOT NULL CHECK (shares > 0),
+  price_per_share NUMERIC(12, 4) NOT NULL CHECK (price_per_share > 0),
+  total_amount NUMERIC(15, 2) NOT NULL,
+  fees NUMERIC(15, 2) DEFAULT 0,
+  exchange_rate NUMERIC(10, 4),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+CREATE INDEX idx_transactions_stock_id ON transactions(stock_id);
+CREATE INDEX idx_transactions_date ON transactions(transaction_date DESC);
+
 -- updated_at自動更新トリガー
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -379,6 +419,16 @@ CREATE TRIGGER update_holdings_updated_at
 
 CREATE TRIGGER update_dividends_updated_at
   BEFORE UPDATE ON dividends
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_profiles_updated_at
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_transactions_updated_at
+  BEFORE UPDATE ON transactions
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 ```
@@ -454,6 +504,20 @@ CREATE POLICY "Anyone can view stock_price_history"
   ON stock_price_history FOR SELECT
   TO authenticated
   USING (true);
+
+-- user_profiles のRLS
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own profile"
+  ON user_profiles FOR ALL
+  USING (auth.uid() = user_id);
+
+-- transactions のRLS
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own transactions"
+  ON transactions FOR ALL
+  USING (auth.uid() = user_id);
 ```
 
 #### 4-3. マイグレーションを実行
@@ -613,7 +677,14 @@ export const dividendRouter = router({
         holdingId: z.string().uuid(),
         receivedDate: z.date(),
         amountAfterTax: z.number().positive(),
-        taxType: z.enum(['JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD']),
+        taxType: z.enum([
+          'JP_STANDARD',
+          'JP_NISA',
+          'US_STANDARD',
+          'US_NISA',
+          'ADR_STANDARD',
+          'ADR_NISA',
+        ]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -933,12 +1004,244 @@ http://localhost:3000
 ✅ Next.js + TypeScriptプロジェクト
 ✅ Tailwind CSS + shadcn/ui
 ✅ Supabase（Auth + Database）
-✅ データベーステーブル + RLS
-✅ tRPC（型安全なAPI）
-✅ yahoo-finance2（株価データ）
-✅ ExchangeRate API（為替レート）
-✅ 認証ページ
+✅ データベーステーブル + RLS（Phase 1必須テーブル含む）
+
+- securities_accounts（証券口座）
+- stocks（銘柄マスター）
+- holdings（保有銘柄）※ is_activeフラグ追加
+- dividends（配当履歴）
+- exchange_rates（為替レート）
+- stock_price_history（株価履歴）
+- **user_profiles（ユーザー設定）** ← Phase 1で追加
+- **transactions（売買履歴）** ← Phase 1で追加
+  ✅ tRPC（型安全なAPI）
+  ✅ yahoo-finance2（株価データ）
+  ✅ ExchangeRate API（為替レート）
+  ✅ 認証ページ
 
 次のステップは、各機能（ダッシュボード、銘柄管理、配当入力など）の実装です。
 
 [DEVELOPMENT.md](./DEVELOPMENT.md) を参照して、開発を進めてください。
+
+---
+
+## 📊 Phase 2以降で追加を検討するテーブル
+
+Phase 1では実装せず、Phase 2以降で機能拡張時に追加を検討するテーブルです。
+
+### 🔧 優先度：中（Phase 2-3で検討）
+
+#### 1. batch_execution_logs（バッチ実行履歴）
+
+**目的**: データ更新バッチの成功/失敗を追跡、デバッグに有用
+
+```sql
+CREATE TABLE batch_execution_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  batch_type TEXT NOT NULL, -- 'EXCHANGE_RATE', 'STOCK_PRICE', 'STOCK_INFO'
+  status TEXT NOT NULL CHECK (status IN ('SUCCESS', 'FAILED', 'PARTIAL')),
+  records_processed INTEGER DEFAULT 0,
+  records_failed INTEGER DEFAULT 0,
+  error_message TEXT,
+  execution_time_ms INTEGER,
+  executed_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_batch_logs_type_date ON batch_execution_logs(batch_type, executed_at DESC);
+```
+
+**メリット**:
+
+- バッチ処理の監視とデバッグが容易
+- エラー発生時の原因特定がスムーズ
+- パフォーマンス分析が可能
+
+---
+
+#### 2. dividend_forecasts（配当予測）
+
+**目的**: ユーザーが手動で修正した配当予測を保存
+
+```sql
+CREATE TABLE dividend_forecasts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  holding_id UUID NOT NULL REFERENCES holdings(id) ON DELETE CASCADE,
+  forecast_year INTEGER NOT NULL,
+  forecast_month INTEGER NOT NULL CHECK (forecast_month BETWEEN 1 AND 12),
+  estimated_dividend_per_share NUMERIC(10, 4),
+  is_manual_override BOOLEAN DEFAULT false,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(holding_id, forecast_year, forecast_month)
+);
+
+CREATE INDEX idx_dividend_forecasts_holding ON dividend_forecasts(holding_id);
+
+-- RLS設定
+ALTER TABLE dividend_forecasts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own forecasts"
+  ON dividend_forecasts FOR ALL
+  USING (auth.uid() = user_id);
+
+-- updated_atトリガー
+CREATE TRIGGER update_dividend_forecasts_updated_at
+  BEFORE UPDATE ON dividend_forecasts
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+**メリット**:
+
+- 増配・減配の予測をユーザーが管理可能
+- より正確な将来シミュレーションが可能
+
+---
+
+#### 3. watchlist（ウォッチリスト）
+
+**目的**: 購入を検討している銘柄の管理
+
+```sql
+CREATE TABLE watchlist (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  stock_id UUID NOT NULL REFERENCES stocks(id) ON DELETE CASCADE,
+  target_price NUMERIC(12, 4),
+  target_yield NUMERIC(6, 4),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, stock_id)
+);
+
+CREATE INDEX idx_watchlist_user ON watchlist(user_id);
+
+-- RLS設定
+ALTER TABLE watchlist ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own watchlist"
+  ON watchlist FOR ALL
+  USING (auth.uid() = user_id);
+```
+
+**メリット**:
+
+- 購入候補銘柄の管理が可能
+- 目標価格到達時のアラート機能の基盤
+
+---
+
+### 💡 優先度：低（Phase 4以降または機能拡張時）
+
+#### 4. notification_settings（通知設定）
+
+**目的**: プッシュ通知機能の設定管理
+
+```sql
+CREATE TABLE notification_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  ex_dividend_alert_days INTEGER DEFAULT 7, -- 権利落ち日の何日前
+  email_notifications_enabled BOOLEAN DEFAULT true,
+  push_notifications_enabled BOOLEAN DEFAULT false,
+  price_alert_enabled BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- RLS設定
+ALTER TABLE notification_settings ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own notification settings"
+  ON notification_settings FOR ALL
+  USING (auth.uid() = user_id);
+
+-- updated_atトリガー
+CREATE TRIGGER update_notification_settings_updated_at
+  BEFORE UPDATE ON notification_settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+```
+
+**使用シーン**: 要件定義の「今後の拡張性」に記載されたプッシュ通知機能の実装時
+
+---
+
+#### 5. audit_logs（監査ログ）
+
+**目的**: セキュリティ強化、データ変更履歴の追跡
+
+```sql
+CREATE TABLE audit_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  table_name TEXT NOT NULL,
+  record_id UUID NOT NULL,
+  action TEXT NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+  old_values JSONB,
+  new_values JSONB,
+  ip_address INET,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_logs_user_date ON audit_logs(user_id, created_at DESC);
+CREATE INDEX idx_audit_logs_table_record ON audit_logs(table_name, record_id);
+
+-- RLS設定
+ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own audit logs"
+  ON audit_logs FOR SELECT
+  USING (auth.uid() = user_id);
+```
+
+**使用シーン**: セキュリティ要件が厳しくなった場合、または不正アクセス対策が必要な場合
+
+---
+
+#### 6. portfolio_snapshots（ポートフォリオスナップショット）
+
+**目的**: 特定時点のポートフォリオ状態を保存（パフォーマンス分析用）
+
+```sql
+CREATE TABLE portfolio_snapshots (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  snapshot_date DATE NOT NULL,
+  total_market_value NUMERIC(15, 2) NOT NULL,
+  total_investment NUMERIC(15, 2) NOT NULL,
+  total_dividends NUMERIC(15, 2) NOT NULL,
+  unrealized_gain NUMERIC(15, 2),
+  recovery_rate NUMERIC(6, 4),
+  holdings_snapshot JSONB, -- その時点の保有状況
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, snapshot_date)
+);
+
+CREATE INDEX idx_portfolio_snapshots_user_date ON portfolio_snapshots(user_id, snapshot_date DESC);
+
+-- RLS設定
+ALTER TABLE portfolio_snapshots ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own snapshots"
+  ON portfolio_snapshots FOR ALL
+  USING (auth.uid() = user_id);
+```
+
+**使用シーン**: 四半期別資産額推移グラフの精度向上、長期パフォーマンス分析
+
+---
+
+### 📋 テーブル追加の判断基準
+
+新しいテーブルを追加する際は、以下を考慮してください：
+
+1. **必要性**: その機能は現在のユーザーが本当に必要としているか？
+2. **複雑性**: 既存テーブルの拡張で対応できないか？
+3. **パフォーマンス**: テーブル分割によるパフォーマンス改善が見込めるか？
+4. **保守性**: RLSポリシー、インデックス、トリガーの管理コストは許容範囲か？
+
+**推奨アプローチ**: Phase 1では最小限のテーブル構成で開始し、実際のユーザーフィードバックを元に段階的に拡張する。
