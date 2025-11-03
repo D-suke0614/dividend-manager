@@ -76,7 +76,7 @@ CREATE TABLE securities_accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   account_name TEXT NOT NULL,
-  account_type TEXT NOT NULL CHECK (account_type IN ('特定口座', 'NISA', 'つみたてNISA')),
+  account_type TEXT NOT NULL CHECK (account_type IN ('特定口座', 'NISA', 'つみたてNISA', '新NISA')),
   display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
