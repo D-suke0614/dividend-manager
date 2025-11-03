@@ -1,7 +1,5 @@
-import { PrismaClient } from '@/generated/prisma/client';
+import { prisma } from '@/lib/prisma';
 import Form from 'next/form';
-
-const prisma = new PrismaClient();
 
 export default function Home() {
   // Server Action
