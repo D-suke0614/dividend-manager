@@ -33,6 +33,8 @@ const config = [
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          destructuredArrayIgnorePattern: '^_'
         },
       ],
       '@typescript-eslint/no-explicit-any': 'warn',
