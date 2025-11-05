@@ -9,23 +9,156 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
-model User {
- id    Int     @id @default(autoincrement())
- email String  @unique
- name  String?
- posts Post[]
+model SecuritiesAccount {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String        @db.Uuid
+  accountName  String
+  accountType  String // CHECK: '特定口座', 'NISA', 'つみたてNISA', '新NISA'
+  displayOrder Int           @default(0)
+  createdAt    DateTime      @default(now()) @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @db.Timestamptz
+  holdings     Holding[]
+  transactions Transaction[]
+
+  @@index([userId])
+  @@map("securities_accounts")
 }
 
-model Post {
- id        Int     @id @default(autoincrement())
- title     String
- content   String?
- published Boolean @default(false)
- author    User    @relation(fields: [authorId], references: [id])
- authorId  Int
+model Stock {
+  id                      String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  symbol                  String              @unique
+  name                    String
+  market                  String // CHECK: 'JP', 'US', 'ADR'
+  currency                String              @default("USD") // CHECK: 'USD', 'JPY'
+  sector                  String?
+  currentPrice            Decimal?            @db.Decimal(12, 4)
+  dividendYield           Decimal?            @db.Decimal(6, 4)
+  latestDividendPerShare  Decimal?            @db.Decimal(10, 4)
+  exDividendDate          DateTime?           @db.Date
+  dividendMonths          Int[] // 配当月の配列（例: {2,5,8,11}）
+  lastUpdated             DateTime?           @db.Timestamptz
+  createdAt               DateTime            @default(now()) @db.Timestamptz
+  holdings                Holding[]
+  transactions            Transaction[]
+  stockPriceHistory       StockPriceHistory[]
+
+  @@index([symbol])
+  @@index([market])
+  @@map("stocks")
+}
+
+model Holding {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId       String     @db.Uuid
+  accountId    String     @db.Uuid
+  stockId      String     @db.Uuid
+  shares       Int // CHECK: shares > 0
+  averagePrice Decimal    @db.Decimal(12, 4) // CHECK: average_price > 0
+  totalCost    Decimal    @db.Decimal(15, 2) // CHECK: total_cost > 0
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now()) @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @db.Timestamptz
+  account      SecuritiesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock        Stock      @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  dividends    Dividend[]
+
+  @@unique([accountId, stockId])
+  @@index([userId])
+  @@index([accountId])
+  @@index([stockId])
+  @@index([userId, isActive])
+  @@map("holdings")
+}
+
+model Dividend {
+  id                         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                     String   @db.Uuid
+  holdingId                  String   @db.Uuid
+  receivedDate               DateTime @db.Date
+  sharesAtPayment            Int // CHECK: shares_at_payment > 0
+  dividendPerShareBeforeTax  Decimal? @db.Decimal(10, 4)
+  amountBeforeTax            Decimal? @db.Decimal(15, 2)
+  amountAfterTax             Decimal  @db.Decimal(15, 2) // CHECK: amount_after_tax > 0
+  taxType                    String // CHECK: 'JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD', 'ADR_NISA'
+  foreignTax                 Decimal  @default(0) @db.Decimal(15, 2)
+  domesticTax                Decimal  @default(0) @db.Decimal(15, 2)
+  exchangeRate               Decimal? @db.Decimal(10, 4)
+  amountJpy                  Decimal? @db.Decimal(15, 2)
+  notes                      String?
+  createdAt                  DateTime @default(now()) @db.Timestamptz
+  updatedAt                  DateTime @updatedAt @db.Timestamptz
+  holding                    Holding  @relation(fields: [holdingId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([holdingId])
+  @@index([receivedDate])
+  @@map("dividends")
+}
+
+model Transaction {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String   @db.Uuid
+  accountId       String   @db.Uuid
+  stockId         String   @db.Uuid
+  transactionType String // CHECK: 'BUY', 'SELL'
+  transactionDate DateTime @db.Date
+  shares          Int // CHECK: shares > 0
+  pricePerShare   Decimal  @db.Decimal(12, 4) // CHECK: price_per_share > 0
+  totalAmount     Decimal  @db.Decimal(15, 2)
+  fees            Decimal  @default(0) @db.Decimal(15, 2)
+  exchangeRate    Decimal? @db.Decimal(10, 4)
+  notes           String?
+  createdAt       DateTime @default(now()) @db.Timestamptz
+  updatedAt       DateTime @updatedAt @db.Timestamptz
+  account         SecuritiesAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  stock           Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([accountId])
+  @@index([stockId])
+  @@index([transactionDate(sort: Desc)])
+  @@map("transactions")
+}
+
+model UserProfile {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String   @unique @db.Uuid
+  defaultCurrency      String   @default("JPY") // CHECK: 'JPY', 'USD'
+  decimalPlaces        Int      @default(2) // CHECK: BETWEEN 0 AND 4
+  dividendMonthFormat  String   @default("number") // CHECK: 'number', 'name'
+  autoUpdateEnabled    Boolean  @default(true)
+  updateTime           DateTime @default(dbgenerated("'09:00:00'::time")) @db.Time
+  createdAt            DateTime @default(now()) @db.Timestamptz
+  updatedAt            DateTime @updatedAt @db.Timestamptz
+
+  @@index([userId])
+  @@map("user_profiles")
+}
+
+model ExchangeRate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date      DateTime @unique @db.Date
+  usdJpy    Decimal  @db.Decimal(10, 4) // CHECK: usd_jpy > 0
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@index([date(sort: Desc)])
+  @@map("exchange_rates")
+}
+
+model StockPriceHistory {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  stockId    String   @db.Uuid
+  date       DateTime @db.Date
+  closePrice Decimal  @db.Decimal(12, 4) // CHECK: close_price > 0
+  createdAt  DateTime @default(now()) @db.Timestamptz
+  stock      Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
+
+  @@unique([stockId, date])
+  @@index([stockId, date(sort: Desc)])
+  @@map("stock_price_history")
 }
