@@ -15,6 +15,10 @@
 
 ## 📊 ER図
 
+**詳細なER図（Mermaid形式）**: [docs/diagrams/database-erd.md](../diagrams/database-erd.md)
+
+### 簡易版ER図
+
 ```
 ┌─────────────┐
 │    users    │
@@ -22,25 +26,24 @@
 │    Auth)    │
 └──────┬──────┘
        │
-       ├─────────────────────┐
-       │                     │
-       ↓                     ↓
-┌──────────────┐      ┌─────────────┐
-│  securities  │      │   stocks    │
-│  _accounts   │      │             │
-└──────┬───────┘      └──────┬──────┘
-       │                     │
-       │                     │
-       └──────┬──────────────┘
-              ↓
-       ┌──────────────┐
-       │   holdings   │
-       └──────┬───────┘
-              │
-              ↓
-       ┌──────────────┐
-       │  dividends   │
-       └──────────────┘
+       ├──────────────────────────────┐
+       │                              │
+       ↓                              ↓
+┌──────────────┐  ┌────────────┐  ┌─────────────┐
+│user_profiles │  │securities  │  │   stocks    │
+│              │  │_accounts   │  │             │
+└──────────────┘  └──────┬─────┘  └──────┬──────┘
+                         │               │
+                         ├───────────────┤
+                         ↓               ↓
+                  ┌──────────────┐ ┌─────────────┐
+                  │ transactions │ │   holdings  │
+                  └──────────────┘ └──────┬──────┘
+                                          │
+                                          ↓
+                                   ┌──────────────┐
+                                   │  dividends   │
+                                   └──────────────┘
 
 ┌──────────────────┐
 │ exchange_rates   │
@@ -53,6 +56,8 @@
 │(株価履歴)        │
 └──────────────────┘
 ```
+
+> **Note**: より詳細なER図（カラム定義、リレーションシップ、インデックス情報を含む）は [database-erd.md](../diagrams/database-erd.md) を参照してください。
 
 ---
 
@@ -76,7 +81,7 @@ CREATE TABLE securities_accounts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   account_name TEXT NOT NULL,
-  account_type TEXT NOT NULL CHECK (account_type IN ('特定口座', 'NISA', 'つみたてNISA')),
+  account_type TEXT NOT NULL CHECK (account_type IN ('特定口座', 'NISA', 'つみたてNISA', '新NISA')),
   display_order INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -148,6 +153,7 @@ CREATE TABLE holdings (
   shares INTEGER NOT NULL CHECK (shares > 0),
   average_price NUMERIC(12, 4) NOT NULL CHECK (average_price > 0),
   total_cost NUMERIC(15, 2) NOT NULL CHECK (total_cost > 0),
+  is_active BOOLEAN DEFAULT true,
 
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -158,6 +164,7 @@ CREATE TABLE holdings (
 CREATE INDEX idx_holdings_user_id ON holdings(user_id);
 CREATE INDEX idx_holdings_account_id ON holdings(account_id);
 CREATE INDEX idx_holdings_stock_id ON holdings(stock_id);
+CREATE INDEX idx_holdings_active ON holdings(user_id, is_active);
 ```
 
 **カラム説明:**
@@ -165,6 +172,7 @@ CREATE INDEX idx_holdings_stock_id ON holdings(stock_id);
 - `shares`: 保有株数
 - `average_price`: 平均取得単価
 - `total_cost`: 取得価格合計（= shares × average_price）
+- `is_active`: アクティブフラグ（売却済みの場合はfalse）
 
 **制約:**
 
@@ -191,7 +199,7 @@ CREATE TABLE dividends (
 
   -- 税金情報
   tax_type TEXT NOT NULL CHECK (
-    tax_type IN ('JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD')
+    tax_type IN ('JP_STANDARD', 'JP_NISA', 'US_STANDARD', 'US_NISA', 'ADR_STANDARD', 'ADR_NISA')
   ),
   foreign_tax NUMERIC(15, 2) DEFAULT 0,
   domestic_tax NUMERIC(15, 2) DEFAULT 0,
@@ -267,6 +275,81 @@ CREATE INDEX idx_stock_price_history_stock_date ON stock_price_history(stock_id,
 - `close_price`: 終値
 
 **更新頻度**: 1日1回（バッチ処理）
+
+---
+
+### 8. user_profiles
+
+**説明**: ユーザー設定情報
+
+```sql
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
+  default_currency TEXT DEFAULT 'JPY' CHECK (default_currency IN ('JPY', 'USD')),
+  decimal_places INTEGER DEFAULT 2 CHECK (decimal_places BETWEEN 0 AND 4),
+  dividend_month_format TEXT DEFAULT 'number' CHECK (dividend_month_format IN ('number', 'name')),
+  auto_update_enabled BOOLEAN DEFAULT true,
+  update_time TIME DEFAULT '09:00:00',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_profiles_user_id ON user_profiles(user_id);
+```
+
+**カラム説明:**
+
+- `default_currency`: デフォルト表示通貨（JPY/USD）
+- `decimal_places`: 小数点桁数（0-4）
+- `dividend_month_format`: 配当月の表示形式（数字 or 月名）
+- `auto_update_enabled`: 自動更新の有効/無効
+- `update_time`: 自動更新の実行時刻
+
+---
+
+### 9. transactions
+
+**説明**: 売買履歴（平均取得単価の計算基盤）
+
+```sql
+CREATE TABLE transactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  account_id UUID NOT NULL REFERENCES securities_accounts(id) ON DELETE CASCADE,
+  stock_id UUID NOT NULL REFERENCES stocks(id) ON DELETE CASCADE,
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('BUY', 'SELL')),
+  transaction_date DATE NOT NULL,
+  shares INTEGER NOT NULL CHECK (shares > 0),
+  price_per_share NUMERIC(12, 4) NOT NULL CHECK (price_per_share > 0),
+  total_amount NUMERIC(15, 2) NOT NULL,
+  fees NUMERIC(15, 2) DEFAULT 0,
+  exchange_rate NUMERIC(10, 4),
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_account_id ON transactions(account_id);
+CREATE INDEX idx_transactions_stock_id ON transactions(stock_id);
+CREATE INDEX idx_transactions_date ON transactions(transaction_date DESC);
+```
+
+**カラム説明:**
+
+- `transaction_type`: 取引種別（BUY/SELL）
+- `shares`: 取引株数
+- `price_per_share`: 1株あたり単価
+- `total_amount`: 取引総額
+- `fees`: 手数料
+- `exchange_rate`: 為替レート（外国株の場合）
+
+**メリット:**
+
+- 平均取得単価を正確に計算可能
+- 売却済み銘柄の履歴を保持
+- 投資パフォーマンスの詳細分析が可能
 
 ---
 
@@ -349,6 +432,26 @@ CREATE POLICY "Anyone can view stock_price_history"
   ON stock_price_history FOR SELECT
   TO authenticated
   USING (true);
+```
+
+### 6. user_profiles
+
+```sql
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own profile"
+  ON user_profiles FOR ALL
+  USING (auth.uid() = user_id);
+```
+
+### 7. transactions
+
+```sql
+ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can manage own transactions"
+  ON transactions FOR ALL
+  USING (auth.uid() = user_id);
 ```
 
 ---
@@ -436,6 +539,16 @@ CREATE TRIGGER update_dividends_updated_at
   BEFORE UPDATE ON dividends
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_user_profiles_updated_at
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_transactions_updated_at
+  BEFORE UPDATE ON transactions
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
 ```
 
 ---
@@ -500,16 +613,18 @@ CREATE TABLE stocks (...);
 stocks:           1,000銘柄 × 1KB  = 1MB（全ユーザー共通）
 holdings:         20銘柄 × 1KB     = 20KB
 dividends:        200件 × 500B     = 100KB
+transactions:     100件 × 500B     = 50KB
+user_profiles:    1件 × 1KB        = 1KB
 exchange_rates:   365日 × 100B     = 36KB（全ユーザー共通）
 stock_price_history: 100銘柄 × 365日 × 100B = 3.6MB（全ユーザー共通）
 
-1ユーザー合計: 約120KB
+1ユーザー合計: 約170KB
 ```
 
 ### Supabase無料枠（500MB）での想定
 
 ```
-約4,000ユーザーまで対応可能
+約2,900ユーザーまで対応可能
 （実際は共通データがあるためもっと多い）
 ```
 
@@ -601,10 +716,38 @@ INSERT INTO dividends (user_id, holding_id, received_date, shares_at_payment, am
 
 ## 📝 まとめ
 
+### Phase 1のテーブル構成（9テーブル）
+
+**コアテーブル:**
+
+1. securities_accounts（証券口座）
+2. stocks（銘柄マスター）
+3. holdings（保有銘柄）※ is_activeフラグ追加
+4. dividends（配当履歴）
+5. exchange_rates（為替レート）
+6. stock_price_history（株価履歴）
+
+**Phase 1で追加:** 7. **user_profiles（ユーザー設定）** - 設定画面の実装に必須 8. **transactions（売買履歴）** - 平均取得単価の正確な計算に必須
+
+**Supabase Auth:** 9. auth.users（認証）
+
+### 設計原則
+
 - **正規化**: 第3正規形で冗長性を排除
-- **RLS**: ユーザーごとのデータ分離
-- **インデックス**: よく検索するカラムに設定
+- **RLS**: ユーザーごとのデータ分離（8テーブルすべてに適用）
+- **インデックス**: よく検索するカラムに設定（パフォーマンス最適化）
 - **ビュー**: 複雑な集計を簡素化
-- **トリガー**: updated_atの自動更新
+- **トリガー**: updated_atの自動更新（5テーブルに適用）
+
+### 今後の拡張
+
+Phase 2以降で以下のテーブル追加を検討：
+
+- batch_execution_logs（バッチ監視）
+- dividend_forecasts（配当予測管理）
+- watchlist（銘柄ウォッチリスト）
+- notification_settings（通知設定）
+- audit_logs（監査ログ）
+- portfolio_snapshots（ポートフォリオスナップショット）
 
 このデータベース設計により、安全で効率的なデータ管理が可能になります。
